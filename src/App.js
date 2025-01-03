@@ -3,16 +3,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
 import MainLayout from './components/layout/MainLayout';
 import SupportTablesPage from './components/pages/SupportTablesPage';
-import {
-  CompanyTable,
-  UnitTable,
-  MaterialTable,
-  CostCenterTable,
-  ProductTreeTable,
-  RouteTypeTable,
-  WorkCenterTable,
-  OperationTable
-} from './components/pages/support-tables';
+import CompanyTable from './components/pages/support-tables/CompanyTable';
+import CompanyDetail from './components/pages/support-tables/CompanyDetail';
 
 // Örnek sayfa bileşenleri
 const HomePage = () => <div>Ana Sayfa İçeriği</div>;
@@ -72,13 +64,7 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/tables" element={<SupportTablesPage />} />
             <Route path="/tables/company" element={<CompanyTable />} />
-            <Route path="/tables/unit" element={<UnitTable />} />
-            <Route path="/tables/material" element={<MaterialTable />} />
-            <Route path="/tables/cost-center" element={<CostCenterTable />} />
-            <Route path="/tables/product-tree" element={<ProductTreeTable />} />
-            <Route path="/tables/route-type" element={<RouteTypeTable />} />
-            <Route path="/tables/work-center" element={<WorkCenterTable />} />
-            <Route path="/tables/operation" element={<OperationTable />} />
+            <Route path="/tables/company/:id" element={<CompanyDetail />} />
             <Route path="/contact" element={<ContactPage />} />
           </Routes>
         </MainLayout>

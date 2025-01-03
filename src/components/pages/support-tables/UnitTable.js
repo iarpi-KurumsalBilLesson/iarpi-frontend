@@ -17,13 +17,15 @@ import {
   TextField,
   Divider,
   Tooltip,
+  Snackbar,
   Modal,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Stack,
-  Snackbar,
+  FormControlLabel,
+  Switch,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -31,7 +33,6 @@ import {
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
@@ -39,56 +40,77 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const CompanyTable = () => {
+const UnitTable = () => {
   const navigate = useNavigate();
-  const [companies, setCompanies] = useState([]);
-  const [filteredCompanies, setFilteredCompanies] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [filteredUnits, setFilteredUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [countries, setCountries] = useState([]);
-  const [cities, setCities] = useState([]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [selectedUnit, setSelectedUnit] = useState(null);
   const [filters, setFilters] = useState({
-    comCode: '',
-    comText: ''
+    unitCode: '',
+    unitText: '',
+    mainUnitCode: '',
+    companyName: '',
+    mainUnit: ''
   });
-  const [newCompany, setNewCompany] = useState({
-    comCode: '',
-    comText: '',
-    countryId: '',
-    cityId: '',
-    address: ''
+  const [newUnit, setNewUnit] = useState({
+    companyId: '',
+    unitCode: '',
+    unitText: '',
+    isMainUnit: false,
+    mainUnitCode: ''
   });
+  const [editUnit, setEditUnit] = useState({
+    unitText: '',
+    isMainUnit: false,
+    mainUnitCode: ''
+  });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteItemId, setDeleteItemId] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'error'
   });
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [editCompany, setEditCompany] = useState({
-    comText: ''
-  });
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteItemId, setDeleteItemId] = useState(null);
 
   useEffect(() => {
-    const fetchCompanies = async () => {
+    const fetchUnits = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/companies');
+        const response = await axios.get('http://localhost:8080/units');
+        console.log('Units API Response:', response.data);
         
         if (response.data.status === 'OK') {
-          setCompanies(response.data.data);
-          setFilteredCompanies(response.data.data);
+          setUnits(response.data.data);
+          setFilteredUnits(response.data.data);
           setError(null);
         } else {
           setError('Veri alınırken bir hata oluştu');
         }
       } catch (err) {
+        console.error('API Error:', err);
         setError(err.response?.data?.error || 'Sunucuya bağlanırken bir hata oluştu');
       } finally {
         setLoading(false);
+      }
+    };
+
+    fetchUnits();
+  }, []);
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/companies');
+        if (response.data.status === 'OK') {
+          setCompanies(response.data.data);
+        }
+      } catch (err) {
+        console.error('Şirketler alınırken hata oluştu:', err);
       }
     };
 
@@ -96,14 +118,16 @@ const CompanyTable = () => {
   }, []);
 
   useEffect(() => {
-    // Filtreleme işlemi
-    const filtered = companies.filter(company => {
-      const codeMatch = company.comCode.toLowerCase().includes(filters.comCode.toLowerCase());
-      const textMatch = company.comText.toLowerCase().includes(filters.comText.toLowerCase());
-      return codeMatch && textMatch;
+    const filtered = units.filter(unit => {
+      const codeMatch = unit.unitCode?.toLowerCase().includes(filters.unitCode.toLowerCase()) ?? true;
+      const textMatch = unit.unitText?.toLowerCase().includes(filters.unitText.toLowerCase()) ?? true;
+      const mainUnitCodeMatch = unit.mainUnitCode?.toLowerCase().includes(filters.mainUnitCode.toLowerCase()) ?? true;
+      const companyMatch = unit.companyName?.toLowerCase().includes(filters.companyName.toLowerCase()) ?? true;
+      const mainUnitMatch = filters.mainUnit === '' || unit.mainUnit === (filters.mainUnit === 'true');
+      return codeMatch && textMatch && mainUnitCodeMatch && companyMatch && mainUnitMatch;
     });
-    setFilteredCompanies(filtered);
-  }, [filters, companies]);
+    setFilteredUnits(filtered);
+  }, [filters, units]);
 
   const handleFilterChange = (field) => (event) => {
     setFilters(prev => ({
@@ -114,71 +138,57 @@ const CompanyTable = () => {
 
   const clearFilters = () => {
     setFilters({
-      comCode: '',
-      comText: ''
+      unitCode: '',
+      unitText: '',
+      mainUnitCode: '',
+      companyName: '',
+      mainUnit: ''
     });
   };
 
-  const handleDetailClick = (event, id) => {
-    event.stopPropagation(); // Event'in parent elementlere yayılmasını engelle
-    navigate(`/tables/company/${id}`);
+  const handleInputChange = (field) => (event) => {
+    setNewUnit(prev => ({
+      ...prev,
+      [field]: field === 'isMainUnit' ? event.target.checked : event.target.value
+    }));
   };
 
-  // Ülke ve şehir verilerini çekme
-  useEffect(() => {
-    const fetchCountriesAndCities = async () => {
-      try {
-        const [countriesResponse, citiesResponse] = await Promise.all([
-          axios.get('http://localhost:8080/countries'),
-          axios.get('http://localhost:8080/cities')
-        ]);
+  const handleEditInputChange = (field) => (event) => {
+    setEditUnit(prev => ({
+      ...prev,
+      [field]: field === 'isMainUnit' ? event.target.checked : event.target.value
+    }));
+  };
 
-        if (countriesResponse.data.status === 'OK') {
-          setCountries(countriesResponse.data.data);
-        }
-        if (citiesResponse.data.status === 'OK') {
-          setCities(citiesResponse.data.data);
-        }
-      } catch (err) {
-        console.error('Ülke ve şehir verileri alınırken hata oluştu:', err);
-      }
-    };
-
-    fetchCountriesAndCities();
-  }, []);
-
-  const handleAddCompany = async () => {
+  const handleAddUnit = async () => {
     try {
-      const response = await axios.post('http://localhost:8080/companies', newCompany);
+      const response = await axios.post('http://localhost:8080/units', newUnit);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = [...companies, response.data.data];
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        const updatedUnits = [...units, response.data.data];
+        setUnits(updatedUnits);
+        setFilteredUnits(updatedUnits);
         setIsAddModalOpen(false);
-        setNewCompany({
-          comCode: '',
-          comText: '',
-          countryId: '',
-          cityId: '',
-          address: ''
+        setNewUnit({
+          companyId: '',
+          unitCode: '',
+          unitText: '',
+          isMainUnit: false,
+          mainUnitCode: ''
         });
-        // Başarı mesajı göster
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla eklendi',
+          message: 'Birim başarıyla eklendi',
           severity: 'success'
         });
       } else {
-        // API'den gelen hata mesajını göster
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket eklenirken bir hata oluştu',
+          message: response.data.data || 'Birim eklenirken bir hata oluştu',
           severity: 'error'
         });
       }
     } catch (err) {
-      // API'den gelen hata mesajını göster
       setSnackbar({
         open: true,
         message: err.response?.data?.data || 'Sunucuya bağlanırken bir hata oluştu',
@@ -187,52 +197,36 @@ const CompanyTable = () => {
     }
   };
 
-  const handleInputChange = (field) => (event) => {
-    setNewCompany(prev => ({
-      ...prev,
-      [field]: event.target.value
-    }));
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  const handleEditClick = (company) => {
-    setSelectedCompany(company);
-    setEditCompany({
-      comText: company.comText
+  const handleEditClick = (unit) => {
+    setSelectedUnit(unit);
+    setEditUnit({
+      unitText: unit.unitText,
+      isMainUnit: unit.isMainUnit,
+      mainUnitCode: unit.mainUnitCode
     });
     setIsEditModalOpen(true);
   };
 
-  const handleEditInputChange = (event) => {
-    setEditCompany(prev => ({
-      ...prev,
-      comText: event.target.value
-    }));
-  };
-
   const handleEditSave = async () => {
     try {
-      const response = await axios.put(`http://localhost:8080/companies/${selectedCompany.id}`, editCompany);
+      const response = await axios.put(`http://localhost:8080/unit/${selectedUnit.id}`, editUnit);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = companies.map(company => 
-          company.id === selectedCompany.id ? { ...company, ...response.data.data } : company
+        const updatedUnits = units.map(unit => 
+          unit.id === selectedUnit.id ? { ...unit, ...response.data.data } : unit
         );
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        setUnits(updatedUnits);
+        setFilteredUnits(updatedUnits);
         setIsEditModalOpen(false);
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla güncellendi',
+          message: 'Birim başarıyla güncellendi',
           severity: 'success'
         });
       } else {
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket güncellenirken bir hata oluştu',
+          message: response.data.data || 'Birim güncellenirken bir hata oluştu',
           severity: 'error'
         });
       }
@@ -252,21 +246,21 @@ const CompanyTable = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await axios.delete(`http://localhost:8080/companies/${deleteItemId}`);
+      const response = await axios.delete(`http://localhost:8080/unit/${deleteItemId}`);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = companies.filter(company => company.id !== deleteItemId);
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        const updatedUnits = units.filter(unit => unit.id !== deleteItemId);
+        setUnits(updatedUnits);
+        setFilteredUnits(updatedUnits);
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla silindi',
+          message: 'Birim başarıyla silindi',
           severity: 'success'
         });
       } else {
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket silinirken bir hata oluştu',
+          message: response.data.data || 'Birim silinirken bir hata oluştu',
           severity: 'error'
         });
       }
@@ -280,6 +274,10 @@ const CompanyTable = () => {
       setDeleteConfirmOpen(false);
       setDeleteItemId(null);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   if (loading) {
@@ -317,7 +315,7 @@ const CompanyTable = () => {
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h5">
-            Şirket Destek Tablosu
+            Birim Destek Tablosu
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
@@ -326,7 +324,7 @@ const CompanyTable = () => {
             startIcon={<AddIcon />}
             onClick={() => setIsAddModalOpen(true)}
           >
-            Yeni Şirket Ekle
+            Yeni Kayıt Ekle
           </Button>
           <Button
             variant="outlined"
@@ -342,15 +340,18 @@ const CompanyTable = () => {
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell sx={{ fontWeight: 'bold' }}>Şirket Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Birim Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Birim Adı</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Ana Birim Kodu</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Şirket Adı</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Ana Birim</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredCompanies.map((company) => (
+            {filteredUnits.map((unit) => (
               <TableRow 
-                key={company.id} 
+                key={unit.id} 
                 hover
                 sx={{ 
                   '&:hover': {
@@ -358,23 +359,17 @@ const CompanyTable = () => {
                   },
                 }}
               >
-                <TableCell>{company.comCode}</TableCell>
-                <TableCell>{company.comText}</TableCell>
+                <TableCell>{unit.unitCode}</TableCell>
+                <TableCell>{unit.unitText}</TableCell>
+                <TableCell>{unit.mainUnitCode}</TableCell>
+                <TableCell>{unit.companyName}</TableCell>
+                <TableCell>{unit.mainUnit ? 'Evet' : 'Hayır'}</TableCell>
                 <TableCell align="right">
                   <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                    <Tooltip title="Detay Görüntüle">
-                      <IconButton 
-                        size="small"
-                        onClick={(e) => handleDetailClick(e, company.id)}
-                        sx={{ color: 'info.main' }}
-                      >
-                        <VisibilityIcon />
-                      </IconButton>
-                    </Tooltip>
                     <Tooltip title="Düzenle">
                       <IconButton 
                         size="small"
-                        onClick={() => handleEditClick(company)}
+                        onClick={() => handleEditClick(unit)}
                         sx={{ color: 'primary.main' }}
                       >
                         <EditIcon />
@@ -383,7 +378,7 @@ const CompanyTable = () => {
                     <Tooltip title="Sil">
                       <IconButton 
                         size="small"
-                        onClick={() => handleDeleteClick(company.id)}
+                        onClick={() => handleDeleteClick(unit.id)}
                         sx={{ color: 'error.main' }}
                       >
                         <DeleteIcon />
@@ -397,6 +392,7 @@ const CompanyTable = () => {
         </Table>
       </TableContainer>
 
+      {/* Filtre Drawer'ı */}
       <Drawer
         anchor="right"
         open={isFilterOpen}
@@ -416,21 +412,49 @@ const CompanyTable = () => {
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
-            label="Şirket Kodu"
+            label="Birim Kodu"
             variant="outlined"
             size="small"
             fullWidth
-            value={filters.comCode}
-            onChange={handleFilterChange('comCode')}
+            value={filters.unitCode}
+            onChange={handleFilterChange('unitCode')}
+          />
+          <TextField
+            label="Birim Adı"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={filters.unitText}
+            onChange={handleFilterChange('unitText')}
+          />
+          <TextField
+            label="Ana Birim Kodu"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={filters.mainUnitCode}
+            onChange={handleFilterChange('mainUnitCode')}
           />
           <TextField
             label="Şirket Adı"
             variant="outlined"
             size="small"
             fullWidth
-            value={filters.comText}
-            onChange={handleFilterChange('comText')}
+            value={filters.companyName}
+            onChange={handleFilterChange('companyName')}
           />
+          <FormControl fullWidth size="small">
+            <InputLabel>Ana Birim</InputLabel>
+            <Select
+              value={filters.mainUnit}
+              label="Ana Birim"
+              onChange={handleFilterChange('mainUnit')}
+            >
+              <MenuItem value="">Tümü</MenuItem>
+              <MenuItem value="true">Evet</MenuItem>
+              <MenuItem value="false">Hayır</MenuItem>
+            </Select>
+          </FormControl>
           
           <Box sx={{ mt: 2 }}>
             <Button 
@@ -452,6 +476,7 @@ const CompanyTable = () => {
         </Box>
       </Drawer>
 
+      {/* Yeni Kayıt Modalı */}
       <Modal
         open={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -471,61 +496,54 @@ const CompanyTable = () => {
           overflow: 'auto'
         }}>
           <Typography variant="h6" sx={{ mb: 3 }}>
-            Yeni Şirket Ekle
+            Yeni Birim Ekle
           </Typography>
 
           <Stack spacing={3}>
-            <TextField
-              label="Şirket Kodu"
-              fullWidth
-              value={newCompany.comCode}
-              onChange={handleInputChange('comCode')}
-            />
-
-            <TextField
-              label="Şirket Adı"
-              fullWidth
-              value={newCompany.comText}
-              onChange={handleInputChange('comText')}
-            />
-
             <FormControl fullWidth>
-              <InputLabel>Ülke</InputLabel>
+              <InputLabel>Şirket</InputLabel>
               <Select
-                value={newCompany.countryId}
-                label="Ülke"
-                onChange={handleInputChange('countryId')}
+                value={newUnit.companyId}
+                label="Şirket"
+                onChange={handleInputChange('companyId')}
               >
-                {countries.map((country) => (
-                  <MenuItem key={country.id} value={country.id}>
-                    {country.countryText}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel>Şehir</InputLabel>
-              <Select
-                value={newCompany.cityId}
-                label="Şehir"
-                onChange={handleInputChange('cityId')}
-              >
-                {cities.map((city) => (
-                  <MenuItem key={city.id} value={city.id}>
-                    {city.cityText}
+                {companies.map((company) => (
+                  <MenuItem key={company.id} value={company.id}>
+                    {company.comCode}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
             <TextField
-              label="Adres"
+              label="Birim Kodu"
               fullWidth
-              multiline
-              rows={3}
-              value={newCompany.address}
-              onChange={handleInputChange('address')}
+              value={newUnit.unitCode}
+              onChange={handleInputChange('unitCode')}
+            />
+
+            <TextField
+              label="Birim Adı"
+              fullWidth
+              value={newUnit.unitText}
+              onChange={handleInputChange('unitText')}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={newUnit.isMainUnit}
+                  onChange={handleInputChange('isMainUnit')}
+                />
+              }
+              label="Ana Birim"
+            />
+
+            <TextField
+              label="Ana Birim Kodu"
+              fullWidth
+              value={newUnit.mainUnitCode}
+              onChange={handleInputChange('mainUnitCode')}
             />
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -537,7 +555,7 @@ const CompanyTable = () => {
               </Button>
               <Button
                 variant="contained"
-                onClick={handleAddCompany}
+                onClick={handleAddUnit}
               >
                 Kaydet
               </Button>
@@ -546,6 +564,7 @@ const CompanyTable = () => {
         </Box>
       </Modal>
 
+      {/* Düzenleme Modalı */}
       <Modal
         open={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -565,17 +584,32 @@ const CompanyTable = () => {
           overflow: 'auto'
         }}>
           <Typography variant="h6" sx={{ mb: 3 }}>
-            Şirket Düzenle
+            Birim Düzenle
           </Typography>
 
           <Stack spacing={3}>
             <TextField
-              label="Şirket Açıklaması"
+              label="Birim Adı"
               fullWidth
-              multiline
-              rows={4}
-              value={editCompany.comText}
-              onChange={handleEditInputChange}
+              value={editUnit.unitText}
+              onChange={handleEditInputChange('unitText')}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editUnit.isMainUnit}
+                  onChange={handleEditInputChange('isMainUnit')}
+                />
+              }
+              label="Ana Birim"
+            />
+
+            <TextField
+              label="Ana Birim Kodu"
+              fullWidth
+              value={editUnit.mainUnitCode}
+              onChange={handleEditInputChange('mainUnitCode')}
             />
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -596,6 +630,7 @@ const CompanyTable = () => {
         </Box>
       </Modal>
 
+      {/* Silme Onay Dialogu */}
       <Dialog
         open={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}
@@ -605,7 +640,7 @@ const CompanyTable = () => {
         </DialogTitle>
         <DialogContent>
           <Typography>
-            Bu şirketi silmek istediğinizden emin misiniz?
+            Bu birimi silmek istediğinizden emin misiniz?
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -618,6 +653,7 @@ const CompanyTable = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
@@ -637,4 +673,4 @@ const CompanyTable = () => {
   );
 };
 
-export default CompanyTable; 
+export default UnitTable; 

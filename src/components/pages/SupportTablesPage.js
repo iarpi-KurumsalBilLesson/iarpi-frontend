@@ -49,10 +49,10 @@ const supportCards = [
   },
   {
     title: 'Ürün Ağacı Destek Tablosu',
-    description: 'Ürün ağacı yapılandırması ve yönetimi',
+    description: 'Ürün ağacı kayıtları ve yönetimi',
     icon: AccountTreeIcon,
-    color: '#db2777',
-    path: '/tables/product-tree'
+    color: '#0891b2',
+    path: '/tables/bom'
   },
   {
     title: 'Rota Tipi Destek Tablosu',

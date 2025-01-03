@@ -17,13 +17,15 @@ import {
   TextField,
   Divider,
   Tooltip,
+  Snackbar,
   Modal,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Stack,
-  Snackbar,
+  FormControlLabel,
+  Switch,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -31,7 +33,6 @@ import {
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
@@ -39,56 +40,73 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const CompanyTable = () => {
+const CostCenterTable = () => {
   const navigate = useNavigate();
-  const [companies, setCompanies] = useState([]);
-  const [filteredCompanies, setFilteredCompanies] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
+  const [filteredCostCenters, setFilteredCostCenters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [countries, setCountries] = useState([]);
-  const [cities, setCities] = useState([]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [selectedCostCenter, setSelectedCostCenter] = useState(null);
   const [filters, setFilters] = useState({
-    comCode: '',
-    comText: ''
+    docType: '',
+    docText: '',
+    companyName: ''
   });
-  const [newCompany, setNewCompany] = useState({
-    comCode: '',
-    comText: '',
-    countryId: '',
-    cityId: '',
-    address: ''
+  const [newCostCenter, setNewCostCenter] = useState({
+    companyId: '',
+    docType: '',
+    docText: '',
+    isPassive: false
   });
+  const [editCostCenter, setEditCostCenter] = useState({
+    docText: '',
+    isPassive: false
+  });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteItemId, setDeleteItemId] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'error'
   });
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [editCompany, setEditCompany] = useState({
-    comText: ''
-  });
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteItemId, setDeleteItemId] = useState(null);
 
   useEffect(() => {
-    const fetchCompanies = async () => {
+    const fetchCostCenters = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/companies');
+        const response = await axios.get('http://localhost:8080/cost-centers');
+        console.log('Cost Centers API Response:', response.data);
         
         if (response.data.status === 'OK') {
-          setCompanies(response.data.data);
-          setFilteredCompanies(response.data.data);
+          setCostCenters(response.data.data);
+          setFilteredCostCenters(response.data.data);
           setError(null);
         } else {
           setError('Veri alınırken bir hata oluştu');
         }
       } catch (err) {
+        console.error('API Error:', err);
         setError(err.response?.data?.error || 'Sunucuya bağlanırken bir hata oluştu');
       } finally {
         setLoading(false);
+      }
+    };
+
+    fetchCostCenters();
+  }, []);
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/companies');
+        if (response.data.status === 'OK') {
+          setCompanies(response.data.data);
+        }
+      } catch (err) {
+        console.error('Şirketler alınırken hata oluştu:', err);
       }
     };
 
@@ -96,14 +114,14 @@ const CompanyTable = () => {
   }, []);
 
   useEffect(() => {
-    // Filtreleme işlemi
-    const filtered = companies.filter(company => {
-      const codeMatch = company.comCode.toLowerCase().includes(filters.comCode.toLowerCase());
-      const textMatch = company.comText.toLowerCase().includes(filters.comText.toLowerCase());
-      return codeMatch && textMatch;
+    const filtered = costCenters.filter(costCenter => {
+      const typeMatch = costCenter.docType?.toLowerCase().includes(filters.docType.toLowerCase()) ?? true;
+      const textMatch = costCenter.docText?.toLowerCase().includes(filters.docText.toLowerCase()) ?? true;
+      const companyMatch = costCenter.companyName?.toLowerCase().includes(filters.companyName.toLowerCase()) ?? true;
+      return typeMatch && textMatch && companyMatch;
     });
-    setFilteredCompanies(filtered);
-  }, [filters, companies]);
+    setFilteredCostCenters(filtered);
+  }, [filters, costCenters]);
 
   const handleFilterChange = (field) => (event) => {
     setFilters(prev => ({
@@ -114,71 +132,54 @@ const CompanyTable = () => {
 
   const clearFilters = () => {
     setFilters({
-      comCode: '',
-      comText: ''
+      docType: '',
+      docText: '',
+      companyName: ''
     });
   };
 
-  const handleDetailClick = (event, id) => {
-    event.stopPropagation(); // Event'in parent elementlere yayılmasını engelle
-    navigate(`/tables/company/${id}`);
+  const handleInputChange = (field) => (event) => {
+    setNewCostCenter(prev => ({
+      ...prev,
+      [field]: field === 'isPassive' ? event.target.checked : event.target.value
+    }));
   };
 
-  // Ülke ve şehir verilerini çekme
-  useEffect(() => {
-    const fetchCountriesAndCities = async () => {
-      try {
-        const [countriesResponse, citiesResponse] = await Promise.all([
-          axios.get('http://localhost:8080/countries'),
-          axios.get('http://localhost:8080/cities')
-        ]);
+  const handleEditInputChange = (field) => (event) => {
+    setEditCostCenter(prev => ({
+      ...prev,
+      [field]: field === 'isPassive' ? event.target.checked : event.target.value
+    }));
+  };
 
-        if (countriesResponse.data.status === 'OK') {
-          setCountries(countriesResponse.data.data);
-        }
-        if (citiesResponse.data.status === 'OK') {
-          setCities(citiesResponse.data.data);
-        }
-      } catch (err) {
-        console.error('Ülke ve şehir verileri alınırken hata oluştu:', err);
-      }
-    };
-
-    fetchCountriesAndCities();
-  }, []);
-
-  const handleAddCompany = async () => {
+  const handleAddCostCenter = async () => {
     try {
-      const response = await axios.post('http://localhost:8080/companies', newCompany);
+      const response = await axios.post('http://localhost:8080/cost-centers', newCostCenter);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = [...companies, response.data.data];
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        const updatedCostCenters = [...costCenters, response.data.data];
+        setCostCenters(updatedCostCenters);
+        setFilteredCostCenters(updatedCostCenters);
         setIsAddModalOpen(false);
-        setNewCompany({
-          comCode: '',
-          comText: '',
-          countryId: '',
-          cityId: '',
-          address: ''
+        setNewCostCenter({
+          companyId: '',
+          docType: '',
+          docText: '',
+          isPassive: false
         });
-        // Başarı mesajı göster
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla eklendi',
+          message: 'Maliyet merkezi başarıyla eklendi',
           severity: 'success'
         });
       } else {
-        // API'den gelen hata mesajını göster
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket eklenirken bir hata oluştu',
+          message: response.data.data || 'Maliyet merkezi eklenirken bir hata oluştu',
           severity: 'error'
         });
       }
     } catch (err) {
-      // API'den gelen hata mesajını göster
       setSnackbar({
         open: true,
         message: err.response?.data?.data || 'Sunucuya bağlanırken bir hata oluştu',
@@ -187,52 +188,35 @@ const CompanyTable = () => {
     }
   };
 
-  const handleInputChange = (field) => (event) => {
-    setNewCompany(prev => ({
-      ...prev,
-      [field]: event.target.value
-    }));
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  const handleEditClick = (company) => {
-    setSelectedCompany(company);
-    setEditCompany({
-      comText: company.comText
+  const handleEditClick = (costCenter) => {
+    setSelectedCostCenter(costCenter);
+    setEditCostCenter({
+      docText: costCenter.docText,
+      isPassive: costCenter.isPassive
     });
     setIsEditModalOpen(true);
   };
 
-  const handleEditInputChange = (event) => {
-    setEditCompany(prev => ({
-      ...prev,
-      comText: event.target.value
-    }));
-  };
-
   const handleEditSave = async () => {
     try {
-      const response = await axios.put(`http://localhost:8080/companies/${selectedCompany.id}`, editCompany);
+      const response = await axios.put(`http://localhost:8080/cost-centers/${selectedCostCenter.id}`, editCostCenter);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = companies.map(company => 
-          company.id === selectedCompany.id ? { ...company, ...response.data.data } : company
+        const updatedCostCenters = costCenters.map(costCenter => 
+          costCenter.id === selectedCostCenter.id ? { ...costCenter, ...response.data.data } : costCenter
         );
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        setCostCenters(updatedCostCenters);
+        setFilteredCostCenters(updatedCostCenters);
         setIsEditModalOpen(false);
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla güncellendi',
+          message: 'Maliyet merkezi başarıyla güncellendi',
           severity: 'success'
         });
       } else {
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket güncellenirken bir hata oluştu',
+          message: response.data.data || 'Maliyet merkezi güncellenirken bir hata oluştu',
           severity: 'error'
         });
       }
@@ -252,21 +236,21 @@ const CompanyTable = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await axios.delete(`http://localhost:8080/companies/${deleteItemId}`);
+      const response = await axios.delete(`http://localhost:8080/cost-centers/${deleteItemId}`);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = companies.filter(company => company.id !== deleteItemId);
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        const updatedCostCenters = costCenters.filter(costCenter => costCenter.id !== deleteItemId);
+        setCostCenters(updatedCostCenters);
+        setFilteredCostCenters(updatedCostCenters);
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla silindi',
+          message: 'Maliyet merkezi başarıyla silindi',
           severity: 'success'
         });
       } else {
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket silinirken bir hata oluştu',
+          message: response.data.data || 'Maliyet merkezi silinirken bir hata oluştu',
           severity: 'error'
         });
       }
@@ -280,6 +264,10 @@ const CompanyTable = () => {
       setDeleteConfirmOpen(false);
       setDeleteItemId(null);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   if (loading) {
@@ -317,7 +305,7 @@ const CompanyTable = () => {
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h5">
-            Şirket Destek Tablosu
+            Maliyet Merkezi Destek Tablosu
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
@@ -326,7 +314,7 @@ const CompanyTable = () => {
             startIcon={<AddIcon />}
             onClick={() => setIsAddModalOpen(true)}
           >
-            Yeni Şirket Ekle
+            Yeni Kayıt Ekle
           </Button>
           <Button
             variant="outlined"
@@ -342,15 +330,17 @@ const CompanyTable = () => {
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell sx={{ fontWeight: 'bold' }}>Şirket Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Maliyet Merkezi Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Maliyet Merkezi Adı</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Şirket Adı</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Durum</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredCompanies.map((company) => (
+            {filteredCostCenters.map((costCenter) => (
               <TableRow 
-                key={company.id} 
+                key={costCenter.id} 
                 hover
                 sx={{ 
                   '&:hover': {
@@ -358,23 +348,16 @@ const CompanyTable = () => {
                   },
                 }}
               >
-                <TableCell>{company.comCode}</TableCell>
-                <TableCell>{company.comText}</TableCell>
+                <TableCell>{costCenter.docType}</TableCell>
+                <TableCell>{costCenter.docText}</TableCell>
+                <TableCell>{costCenter.companyName}</TableCell>
+                <TableCell>{costCenter.isPassive ? 'Pasif' : 'Aktif'}</TableCell>
                 <TableCell align="right">
                   <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                    <Tooltip title="Detay Görüntüle">
-                      <IconButton 
-                        size="small"
-                        onClick={(e) => handleDetailClick(e, company.id)}
-                        sx={{ color: 'info.main' }}
-                      >
-                        <VisibilityIcon />
-                      </IconButton>
-                    </Tooltip>
                     <Tooltip title="Düzenle">
                       <IconButton 
                         size="small"
-                        onClick={() => handleEditClick(company)}
+                        onClick={() => handleEditClick(costCenter)}
                         sx={{ color: 'primary.main' }}
                       >
                         <EditIcon />
@@ -383,7 +366,7 @@ const CompanyTable = () => {
                     <Tooltip title="Sil">
                       <IconButton 
                         size="small"
-                        onClick={() => handleDeleteClick(company.id)}
+                        onClick={() => handleDeleteClick(costCenter.id)}
                         sx={{ color: 'error.main' }}
                       >
                         <DeleteIcon />
@@ -416,20 +399,28 @@ const CompanyTable = () => {
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
-            label="Şirket Kodu"
+            label="Maliyet Merkezi Kodu"
             variant="outlined"
             size="small"
             fullWidth
-            value={filters.comCode}
-            onChange={handleFilterChange('comCode')}
+            value={filters.docType}
+            onChange={handleFilterChange('docType')}
+          />
+          <TextField
+            label="Maliyet Merkezi Adı"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={filters.docText}
+            onChange={handleFilterChange('docText')}
           />
           <TextField
             label="Şirket Adı"
             variant="outlined"
             size="small"
             fullWidth
-            value={filters.comText}
-            onChange={handleFilterChange('comText')}
+            value={filters.companyName}
+            onChange={handleFilterChange('companyName')}
           />
           
           <Box sx={{ mt: 2 }}>
@@ -471,61 +462,47 @@ const CompanyTable = () => {
           overflow: 'auto'
         }}>
           <Typography variant="h6" sx={{ mb: 3 }}>
-            Yeni Şirket Ekle
+            Yeni Maliyet Merkezi Ekle
           </Typography>
 
           <Stack spacing={3}>
-            <TextField
-              label="Şirket Kodu"
-              fullWidth
-              value={newCompany.comCode}
-              onChange={handleInputChange('comCode')}
-            />
-
-            <TextField
-              label="Şirket Adı"
-              fullWidth
-              value={newCompany.comText}
-              onChange={handleInputChange('comText')}
-            />
-
             <FormControl fullWidth>
-              <InputLabel>Ülke</InputLabel>
+              <InputLabel>Şirket</InputLabel>
               <Select
-                value={newCompany.countryId}
-                label="Ülke"
-                onChange={handleInputChange('countryId')}
+                value={newCostCenter.companyId}
+                label="Şirket"
+                onChange={handleInputChange('companyId')}
               >
-                {countries.map((country) => (
-                  <MenuItem key={country.id} value={country.id}>
-                    {country.countryText}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel>Şehir</InputLabel>
-              <Select
-                value={newCompany.cityId}
-                label="Şehir"
-                onChange={handleInputChange('cityId')}
-              >
-                {cities.map((city) => (
-                  <MenuItem key={city.id} value={city.id}>
-                    {city.cityText}
+                {companies.map((company) => (
+                  <MenuItem key={company.id} value={company.id}>
+                    {company.comCode}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
             <TextField
-              label="Adres"
+              label="Maliyet Merkezi Kodu"
               fullWidth
-              multiline
-              rows={3}
-              value={newCompany.address}
-              onChange={handleInputChange('address')}
+              value={newCostCenter.docType}
+              onChange={handleInputChange('docType')}
+            />
+
+            <TextField
+              label="Maliyet Merkezi Adı"
+              fullWidth
+              value={newCostCenter.docText}
+              onChange={handleInputChange('docText')}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={newCostCenter.isPassive}
+                  onChange={handleInputChange('isPassive')}
+                />
+              }
+              label="Pasif"
             />
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -537,7 +514,7 @@ const CompanyTable = () => {
               </Button>
               <Button
                 variant="contained"
-                onClick={handleAddCompany}
+                onClick={handleAddCostCenter}
               >
                 Kaydet
               </Button>
@@ -565,17 +542,25 @@ const CompanyTable = () => {
           overflow: 'auto'
         }}>
           <Typography variant="h6" sx={{ mb: 3 }}>
-            Şirket Düzenle
+            Maliyet Merkezi Düzenle
           </Typography>
 
           <Stack spacing={3}>
             <TextField
-              label="Şirket Açıklaması"
+              label="Maliyet Merkezi Adı"
               fullWidth
-              multiline
-              rows={4}
-              value={editCompany.comText}
-              onChange={handleEditInputChange}
+              value={editCostCenter.docText}
+              onChange={handleEditInputChange('docText')}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editCostCenter.isPassive}
+                  onChange={handleEditInputChange('isPassive')}
+                />
+              }
+              label="Pasif"
             />
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -605,7 +590,7 @@ const CompanyTable = () => {
         </DialogTitle>
         <DialogContent>
           <Typography>
-            Bu şirketi silmek istediğinizden emin misiniz?
+            Bu maliyet merkezini silmek istediğinizden emin misiniz?
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -637,4 +622,4 @@ const CompanyTable = () => {
   );
 };
 
-export default CompanyTable; 
+export default CostCenterTable; 

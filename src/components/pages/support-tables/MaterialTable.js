@@ -17,13 +17,15 @@ import {
   TextField,
   Divider,
   Tooltip,
+  Snackbar,
   Modal,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Stack,
-  Snackbar,
+  FormControlLabel,
+  Switch,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -31,7 +33,6 @@ import {
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
@@ -39,56 +40,73 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const CompanyTable = () => {
+const MaterialTable = () => {
   const navigate = useNavigate();
-  const [companies, setCompanies] = useState([]);
-  const [filteredCompanies, setFilteredCompanies] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [filteredMaterials, setFilteredMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [countries, setCountries] = useState([]);
-  const [cities, setCities] = useState([]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [filters, setFilters] = useState({
-    comCode: '',
-    comText: ''
+    docType: '',
+    docText: '',
+    companyName: ''
   });
-  const [newCompany, setNewCompany] = useState({
-    comCode: '',
-    comText: '',
-    countryId: '',
-    cityId: '',
-    address: ''
+  const [newMaterial, setNewMaterial] = useState({
+    companyId: '',
+    docType: '',
+    docText: '',
+    passive: false
   });
+  const [editMaterial, setEditMaterial] = useState({
+    docText: '',
+    passive: false
+  });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteItemId, setDeleteItemId] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'error'
   });
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [editCompany, setEditCompany] = useState({
-    comText: ''
-  });
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteItemId, setDeleteItemId] = useState(null);
 
   useEffect(() => {
-    const fetchCompanies = async () => {
+    const fetchMaterials = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/companies');
+        const response = await axios.get('http://localhost:8080/materials');
+        console.log('Materials API Response:', response.data);
         
         if (response.data.status === 'OK') {
-          setCompanies(response.data.data);
-          setFilteredCompanies(response.data.data);
+          setMaterials(response.data.data);
+          setFilteredMaterials(response.data.data);
           setError(null);
         } else {
           setError('Veri alınırken bir hata oluştu');
         }
       } catch (err) {
+        console.error('API Error:', err);
         setError(err.response?.data?.error || 'Sunucuya bağlanırken bir hata oluştu');
       } finally {
         setLoading(false);
+      }
+    };
+
+    fetchMaterials();
+  }, []);
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/companies');
+        if (response.data.status === 'OK') {
+          setCompanies(response.data.data);
+        }
+      } catch (err) {
+        console.error('Şirketler alınırken hata oluştu:', err);
       }
     };
 
@@ -96,14 +114,14 @@ const CompanyTable = () => {
   }, []);
 
   useEffect(() => {
-    // Filtreleme işlemi
-    const filtered = companies.filter(company => {
-      const codeMatch = company.comCode.toLowerCase().includes(filters.comCode.toLowerCase());
-      const textMatch = company.comText.toLowerCase().includes(filters.comText.toLowerCase());
-      return codeMatch && textMatch;
+    const filtered = materials.filter(material => {
+      const typeMatch = material.docType?.toLowerCase().includes(filters.docType.toLowerCase()) ?? true;
+      const textMatch = material.docText?.toLowerCase().includes(filters.docText.toLowerCase()) ?? true;
+      const companyMatch = material.companyName?.toLowerCase().includes(filters.companyName.toLowerCase()) ?? true;
+      return typeMatch && textMatch && companyMatch;
     });
-    setFilteredCompanies(filtered);
-  }, [filters, companies]);
+    setFilteredMaterials(filtered);
+  }, [filters, materials]);
 
   const handleFilterChange = (field) => (event) => {
     setFilters(prev => ({
@@ -114,71 +132,54 @@ const CompanyTable = () => {
 
   const clearFilters = () => {
     setFilters({
-      comCode: '',
-      comText: ''
+      docType: '',
+      docText: '',
+      companyName: ''
     });
   };
 
-  const handleDetailClick = (event, id) => {
-    event.stopPropagation(); // Event'in parent elementlere yayılmasını engelle
-    navigate(`/tables/company/${id}`);
+  const handleInputChange = (field) => (event) => {
+    setNewMaterial(prev => ({
+      ...prev,
+      [field]: field === 'passive' ? event.target.checked : event.target.value
+    }));
   };
 
-  // Ülke ve şehir verilerini çekme
-  useEffect(() => {
-    const fetchCountriesAndCities = async () => {
-      try {
-        const [countriesResponse, citiesResponse] = await Promise.all([
-          axios.get('http://localhost:8080/countries'),
-          axios.get('http://localhost:8080/cities')
-        ]);
+  const handleEditInputChange = (field) => (event) => {
+    setEditMaterial(prev => ({
+      ...prev,
+      [field]: field === 'passive' ? event.target.checked : event.target.value
+    }));
+  };
 
-        if (countriesResponse.data.status === 'OK') {
-          setCountries(countriesResponse.data.data);
-        }
-        if (citiesResponse.data.status === 'OK') {
-          setCities(citiesResponse.data.data);
-        }
-      } catch (err) {
-        console.error('Ülke ve şehir verileri alınırken hata oluştu:', err);
-      }
-    };
-
-    fetchCountriesAndCities();
-  }, []);
-
-  const handleAddCompany = async () => {
+  const handleAddMaterial = async () => {
     try {
-      const response = await axios.post('http://localhost:8080/companies', newCompany);
+      const response = await axios.post('http://localhost:8080/materials', newMaterial);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = [...companies, response.data.data];
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        const updatedMaterials = [...materials, response.data.data];
+        setMaterials(updatedMaterials);
+        setFilteredMaterials(updatedMaterials);
         setIsAddModalOpen(false);
-        setNewCompany({
-          comCode: '',
-          comText: '',
-          countryId: '',
-          cityId: '',
-          address: ''
+        setNewMaterial({
+          companyId: '',
+          docType: '',
+          docText: '',
+          passive: false
         });
-        // Başarı mesajı göster
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla eklendi',
+          message: 'Malzeme başarıyla eklendi',
           severity: 'success'
         });
       } else {
-        // API'den gelen hata mesajını göster
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket eklenirken bir hata oluştu',
+          message: response.data.data || 'Malzeme eklenirken bir hata oluştu',
           severity: 'error'
         });
       }
     } catch (err) {
-      // API'den gelen hata mesajını göster
       setSnackbar({
         open: true,
         message: err.response?.data?.data || 'Sunucuya bağlanırken bir hata oluştu',
@@ -187,52 +188,35 @@ const CompanyTable = () => {
     }
   };
 
-  const handleInputChange = (field) => (event) => {
-    setNewCompany(prev => ({
-      ...prev,
-      [field]: event.target.value
-    }));
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  const handleEditClick = (company) => {
-    setSelectedCompany(company);
-    setEditCompany({
-      comText: company.comText
+  const handleEditClick = (material) => {
+    setSelectedMaterial(material);
+    setEditMaterial({
+      docText: material.docText,
+      passive: material.passive
     });
     setIsEditModalOpen(true);
   };
 
-  const handleEditInputChange = (event) => {
-    setEditCompany(prev => ({
-      ...prev,
-      comText: event.target.value
-    }));
-  };
-
   const handleEditSave = async () => {
     try {
-      const response = await axios.put(`http://localhost:8080/companies/${selectedCompany.id}`, editCompany);
+      const response = await axios.put(`http://localhost:8080/materials/${selectedMaterial.id}`, editMaterial);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = companies.map(company => 
-          company.id === selectedCompany.id ? { ...company, ...response.data.data } : company
+        const updatedMaterials = materials.map(material => 
+          material.id === selectedMaterial.id ? { ...material, ...response.data.data } : material
         );
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        setMaterials(updatedMaterials);
+        setFilteredMaterials(updatedMaterials);
         setIsEditModalOpen(false);
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla güncellendi',
+          message: 'Malzeme başarıyla güncellendi',
           severity: 'success'
         });
       } else {
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket güncellenirken bir hata oluştu',
+          message: response.data.data || 'Malzeme güncellenirken bir hata oluştu',
           severity: 'error'
         });
       }
@@ -252,21 +236,21 @@ const CompanyTable = () => {
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await axios.delete(`http://localhost:8080/companies/${deleteItemId}`);
+      const response = await axios.delete(`http://localhost:8080/materials/${deleteItemId}`);
       
       if (response.data.status === 'OK') {
-        const updatedCompanies = companies.filter(company => company.id !== deleteItemId);
-        setCompanies(updatedCompanies);
-        setFilteredCompanies(updatedCompanies);
+        const updatedMaterials = materials.filter(material => material.id !== deleteItemId);
+        setMaterials(updatedMaterials);
+        setFilteredMaterials(updatedMaterials);
         setSnackbar({
           open: true,
-          message: 'Şirket başarıyla silindi',
+          message: 'Malzeme başarıyla silindi',
           severity: 'success'
         });
       } else {
         setSnackbar({
           open: true,
-          message: response.data.data || 'Şirket silinirken bir hata oluştu',
+          message: response.data.data || 'Malzeme silinirken bir hata oluştu',
           severity: 'error'
         });
       }
@@ -280,6 +264,10 @@ const CompanyTable = () => {
       setDeleteConfirmOpen(false);
       setDeleteItemId(null);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   if (loading) {
@@ -317,7 +305,7 @@ const CompanyTable = () => {
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h5">
-            Şirket Destek Tablosu
+            Malzeme Destek Tablosu
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
@@ -326,7 +314,7 @@ const CompanyTable = () => {
             startIcon={<AddIcon />}
             onClick={() => setIsAddModalOpen(true)}
           >
-            Yeni Şirket Ekle
+            Yeni Kayıt Ekle
           </Button>
           <Button
             variant="outlined"
@@ -342,15 +330,17 @@ const CompanyTable = () => {
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell sx={{ fontWeight: 'bold' }}>Şirket Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Malzeme Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Malzeme Adı</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Şirket Adı</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Durum</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredCompanies.map((company) => (
+            {filteredMaterials.map((material) => (
               <TableRow 
-                key={company.id} 
+                key={material.id} 
                 hover
                 sx={{ 
                   '&:hover': {
@@ -358,23 +348,16 @@ const CompanyTable = () => {
                   },
                 }}
               >
-                <TableCell>{company.comCode}</TableCell>
-                <TableCell>{company.comText}</TableCell>
+                <TableCell>{material.docType}</TableCell>
+                <TableCell>{material.docText}</TableCell>
+                <TableCell>{material.companyName}</TableCell>
+                <TableCell>{material.passive ? 'Pasif' : 'Aktif'}</TableCell>
                 <TableCell align="right">
                   <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                    <Tooltip title="Detay Görüntüle">
-                      <IconButton 
-                        size="small"
-                        onClick={(e) => handleDetailClick(e, company.id)}
-                        sx={{ color: 'info.main' }}
-                      >
-                        <VisibilityIcon />
-                      </IconButton>
-                    </Tooltip>
                     <Tooltip title="Düzenle">
                       <IconButton 
                         size="small"
-                        onClick={() => handleEditClick(company)}
+                        onClick={() => handleEditClick(material)}
                         sx={{ color: 'primary.main' }}
                       >
                         <EditIcon />
@@ -383,7 +366,7 @@ const CompanyTable = () => {
                     <Tooltip title="Sil">
                       <IconButton 
                         size="small"
-                        onClick={() => handleDeleteClick(company.id)}
+                        onClick={() => handleDeleteClick(material.id)}
                         sx={{ color: 'error.main' }}
                       >
                         <DeleteIcon />
@@ -416,20 +399,28 @@ const CompanyTable = () => {
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
-            label="Şirket Kodu"
+            label="Malzeme Kodu"
             variant="outlined"
             size="small"
             fullWidth
-            value={filters.comCode}
-            onChange={handleFilterChange('comCode')}
+            value={filters.docType}
+            onChange={handleFilterChange('docType')}
+          />
+          <TextField
+            label="Malzeme Adı"
+            variant="outlined"
+            size="small"
+            fullWidth
+            value={filters.docText}
+            onChange={handleFilterChange('docText')}
           />
           <TextField
             label="Şirket Adı"
             variant="outlined"
             size="small"
             fullWidth
-            value={filters.comText}
-            onChange={handleFilterChange('comText')}
+            value={filters.companyName}
+            onChange={handleFilterChange('companyName')}
           />
           
           <Box sx={{ mt: 2 }}>
@@ -471,61 +462,47 @@ const CompanyTable = () => {
           overflow: 'auto'
         }}>
           <Typography variant="h6" sx={{ mb: 3 }}>
-            Yeni Şirket Ekle
+            Yeni Malzeme Ekle
           </Typography>
 
           <Stack spacing={3}>
-            <TextField
-              label="Şirket Kodu"
-              fullWidth
-              value={newCompany.comCode}
-              onChange={handleInputChange('comCode')}
-            />
-
-            <TextField
-              label="Şirket Adı"
-              fullWidth
-              value={newCompany.comText}
-              onChange={handleInputChange('comText')}
-            />
-
             <FormControl fullWidth>
-              <InputLabel>Ülke</InputLabel>
+              <InputLabel>Şirket</InputLabel>
               <Select
-                value={newCompany.countryId}
-                label="Ülke"
-                onChange={handleInputChange('countryId')}
+                value={newMaterial.companyId}
+                label="Şirket"
+                onChange={handleInputChange('companyId')}
               >
-                {countries.map((country) => (
-                  <MenuItem key={country.id} value={country.id}>
-                    {country.countryText}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel>Şehir</InputLabel>
-              <Select
-                value={newCompany.cityId}
-                label="Şehir"
-                onChange={handleInputChange('cityId')}
-              >
-                {cities.map((city) => (
-                  <MenuItem key={city.id} value={city.id}>
-                    {city.cityText}
+                {companies.map((company) => (
+                  <MenuItem key={company.id} value={company.id}>
+                    {company.comCode}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
             <TextField
-              label="Adres"
+              label="Malzeme Kodu"
               fullWidth
-              multiline
-              rows={3}
-              value={newCompany.address}
-              onChange={handleInputChange('address')}
+              value={newMaterial.docType}
+              onChange={handleInputChange('docType')}
+            />
+
+            <TextField
+              label="Malzeme Adı"
+              fullWidth
+              value={newMaterial.docText}
+              onChange={handleInputChange('docText')}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={newMaterial.passive}
+                  onChange={handleInputChange('passive')}
+                />
+              }
+              label="Pasif"
             />
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -537,7 +514,7 @@ const CompanyTable = () => {
               </Button>
               <Button
                 variant="contained"
-                onClick={handleAddCompany}
+                onClick={handleAddMaterial}
               >
                 Kaydet
               </Button>
@@ -565,17 +542,25 @@ const CompanyTable = () => {
           overflow: 'auto'
         }}>
           <Typography variant="h6" sx={{ mb: 3 }}>
-            Şirket Düzenle
+            Malzeme Düzenle
           </Typography>
 
           <Stack spacing={3}>
             <TextField
-              label="Şirket Açıklaması"
+              label="Malzeme Adı"
               fullWidth
-              multiline
-              rows={4}
-              value={editCompany.comText}
-              onChange={handleEditInputChange}
+              value={editMaterial.docText}
+              onChange={handleEditInputChange('docText')}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={editMaterial.passive}
+                  onChange={handleEditInputChange('passive')}
+                />
+              }
+              label="Pasif"
             />
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -605,7 +590,7 @@ const CompanyTable = () => {
         </DialogTitle>
         <DialogContent>
           <Typography>
-            Bu şirketi silmek istediğinizden emin misiniz?
+            Bu malzemeyi silmek istediğinizden emin misiniz?
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -637,4 +622,4 @@ const CompanyTable = () => {
   );
 };
 
-export default CompanyTable; 
+export default MaterialTable; 

@@ -5,6 +5,13 @@ import MainLayout from './components/layout/MainLayout';
 import SupportTablesPage from './components/pages/SupportTablesPage';
 import CompanyTable from './components/pages/support-tables/CompanyTable';
 import CompanyDetail from './components/pages/support-tables/CompanyDetail';
+import MaterialTable from './components/pages/support-tables/MaterialTable';
+import CostCenterTable from './components/pages/support-tables/CostCenterTable';
+import BomTable from './components/pages/support-tables/BomTable';
+import RouteTable from './components/pages/support-tables/RouteTable';
+import WorkCenterTable from './components/pages/support-tables/WorkCenterTable';
+import OperationTable from './components/pages/support-tables/OperationTable';
+import UnitTable from './components/pages/support-tables/UnitTable';
 
 // Örnek sayfa bileşenleri
 const HomePage = () => <div>Ana Sayfa İçeriği</div>;
@@ -65,6 +72,13 @@ function App() {
             <Route path="/tables" element={<SupportTablesPage />} />
             <Route path="/tables/company" element={<CompanyTable />} />
             <Route path="/tables/company/:id" element={<CompanyDetail />} />
+            <Route path="/tables/material" element={<MaterialTable />} />
+            <Route path="/tables/cost-center" element={<CostCenterTable />} />
+            <Route path="/tables/bom" element={<BomTable />} />
+            <Route path="/tables/route-type" element={<RouteTable />} />
+            <Route path="/tables/work-center" element={<WorkCenterTable />} />
+            <Route path="/tables/operation" element={<OperationTable />} />
+            <Route path="/tables/unit" element={<UnitTable />} />
             <Route path="/contact" element={<ContactPage />} />
           </Routes>
         </MainLayout>

@@ -1,42 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
+import {
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Paper,
   Typography,
+  Button,
+  IconButton,
   Alert,
   CircularProgress,
   Drawer,
-  IconButton,
-  Button,
   TextField,
   Divider,
-  Tooltip,
-  Snackbar,
-  Modal,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Stack,
-  FormControlLabel,
-  Switch,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Tooltip,
+  Modal,
+  Stack,
+  Snackbar
 } from '@mui/material';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import CloseIcon from '@mui/icons-material/Close';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -47,62 +42,42 @@ const WorkCenterTable = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [companies, setCompanies] = useState([]);
-  const [selectedWorkCenter, setSelectedWorkCenter] = useState(null);
   const [filters, setFilters] = useState({
-    docType: '',
-    docText: '',
+    workCenterType: '',
+    wcmDocNumber: '',
+    wcmDocFrom: '',
+    wcmDocUntil: '',
     companyName: ''
   });
-  const [newWorkCenter, setNewWorkCenter] = useState({
-    companyId: '',
-    docType: '',
-    docText: '',
-    isPassive: false
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editData, setEditData] = useState({
+    baseCostCenterId: null,
+    shortText: '',
+    longText: ''
   });
-  const [editWorkCenter, setEditWorkCenter] = useState({
-    docText: '',
-    isPassive: false
-  });
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteItemId, setDeleteItemId] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'error'
+    severity: 'success'
   });
 
   useEffect(() => {
     const fetchWorkCenters = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/work-centers');
-        console.log('Work Centers API Response:', response.data);
+        const response = await axios.get('http://localhost:8080/work-center/head');
         
         if (response.data.status === 'OK') {
-          const workCentersData = response.data.data || [];
-          setWorkCenters(workCentersData);
-          setFilteredWorkCenters(workCentersData);
+          setWorkCenters(response.data.data);
+          setFilteredWorkCenters(response.data.data);
           setError(null);
         } else {
-          const errorMessage = response.data.data || 'Veri alınırken bir hata oluştu';
-          setError(errorMessage);
-          setSnackbar({
-            open: true,
-            message: errorMessage,
-            severity: 'error'
-          });
+          setError('Veri alınırken bir hata oluştu');
         }
       } catch (err) {
-        console.error('API Error Details:', err);
-        const errorMessage = err.response?.data?.data || 'Sunucuya bağlanırken bir hata oluştu';
-        setError(errorMessage);
-        setSnackbar({
-          open: true,
-          message: errorMessage,
-          severity: 'error'
-        });
+        console.error('API Error:', err);
+        setError(err.response?.data?.error || 'Sunucuya bağlanırken bir hata oluştu');
       } finally {
         setLoading(false);
       }
@@ -112,26 +87,14 @@ const WorkCenterTable = () => {
   }, []);
 
   useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const response = await axios.get('http://localhost:8080/companies');
-        if (response.data.status === 'OK') {
-          setCompanies(response.data.data);
-        }
-      } catch (err) {
-        console.error('Şirketler alınırken hata oluştu:', err);
-      }
-    };
-
-    fetchCompanies();
-  }, []);
-
-  useEffect(() => {
     const filtered = workCenters.filter(workCenter => {
-      const typeMatch = workCenter.docType?.toLowerCase().includes(filters.docType.toLowerCase()) ?? true;
-      const textMatch = workCenter.docText?.toLowerCase().includes(filters.docText.toLowerCase()) ?? true;
-      const companyMatch = workCenter.companyName?.toLowerCase().includes(filters.companyName.toLowerCase()) ?? true;
-      return typeMatch && textMatch && companyMatch;
+      return (
+        workCenter.workCenterType?.toLowerCase().includes(filters.workCenterType.toLowerCase()) &&
+        workCenter.wcmDocNumber?.toLowerCase().includes(filters.wcmDocNumber.toLowerCase()) &&
+        workCenter.wcmDocFrom?.toLowerCase().includes(filters.wcmDocFrom.toLowerCase()) &&
+        workCenter.wcmDocUntil?.toLowerCase().includes(filters.wcmDocUntil.toLowerCase()) &&
+        workCenter.companyName?.toLowerCase().includes(filters.companyName.toLowerCase())
+      );
     });
     setFilteredWorkCenters(filtered);
   }, [filters, workCenters]);
@@ -143,122 +106,36 @@ const WorkCenterTable = () => {
     }));
   };
 
-  const handleInputChange = (field) => (event) => {
-    setNewWorkCenter(prev => ({
-      ...prev,
-      [field]: field === 'isPassive' ? event.target.checked : event.target.value
-    }));
-  };
-
-  const handleEditInputChange = (field) => (event) => {
-    setEditWorkCenter(prev => ({
-      ...prev,
-      [field]: field === 'isPassive' ? event.target.checked : event.target.value
-    }));
-  };
-
   const clearFilters = () => {
     setFilters({
-      docType: '',
-      docText: '',
+      workCenterType: '',
+      wcmDocNumber: '',
+      wcmDocFrom: '',
+      wcmDocUntil: '',
       companyName: ''
     });
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  const handleAddWorkCenter = async () => {
-    try {
-      const response = await axios.post('http://localhost:8080/work-centers', newWorkCenter);
-      
-      if (response.data.status === 'OK') {
-        const updatedWorkCenters = [...workCenters, response.data.data];
-        setWorkCenters(updatedWorkCenters);
-        setFilteredWorkCenters(updatedWorkCenters);
-        setIsAddModalOpen(false);
-        setNewWorkCenter({
-          companyId: '',
-          docType: '',
-          docText: '',
-          isPassive: false
-        });
-        setSnackbar({
-          open: true,
-          message: 'İş merkezi başarıyla eklendi',
-          severity: 'success'
-        });
-      } else {
-        setSnackbar({
-          open: true,
-          message: response.data.data || 'İş merkezi eklenirken bir hata oluştu',
-          severity: 'error'
-        });
-      }
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.data || 'Sunucuya bağlanırken bir hata oluştu',
-        severity: 'error'
-      });
-    }
-  };
-
-  const handleEditClick = (workCenter) => {
-    setSelectedWorkCenter(workCenter);
-    setEditWorkCenter({
-      docText: workCenter.docText,
-      isPassive: workCenter.isPassive
-    });
-    setIsEditModalOpen(true);
-  };
-
-  const handleEditSave = async () => {
-    try {
-      const response = await axios.put(`http://localhost:8080/work-centers/${selectedWorkCenter.id}`, editWorkCenter);
-      
-      if (response.data.status === 'OK') {
-        const updatedWorkCenters = workCenters.map(workCenter => 
-          workCenter.id === selectedWorkCenter.id ? { ...workCenter, ...response.data.data } : workCenter
-        );
-        setWorkCenters(updatedWorkCenters);
-        setFilteredWorkCenters(updatedWorkCenters);
-        setIsEditModalOpen(false);
-        setSnackbar({
-          open: true,
-          message: 'İş merkezi başarıyla güncellendi',
-          severity: 'success'
-        });
-      } else {
-        setSnackbar({
-          open: true,
-          message: response.data.data || 'İş merkezi güncellenirken bir hata oluştu',
-          severity: 'error'
-        });
-      }
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: err.response?.data?.data || 'Sunucuya bağlanırken bir hata oluştu',
-        severity: 'error'
-      });
-    }
+  const handleDetailClick = (id) => {
+    navigate(`/work-center/head/${id}`);
   };
 
   const handleDeleteClick = (id) => {
-    setDeleteItemId(id);
-    setDeleteConfirmOpen(true);
+    setSelectedId(id);
+    setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await axios.delete(`http://localhost:8080/work-centers/${deleteItemId}`);
+      const response = await axios.delete(`http://localhost:8080/work-center/head/${selectedId}`);
       
       if (response.data.status === 'OK') {
-        const updatedWorkCenters = workCenters.filter(workCenter => workCenter.id !== deleteItemId);
-        setWorkCenters(updatedWorkCenters);
-        setFilteredWorkCenters(updatedWorkCenters);
+        setWorkCenters(prevWorkCenters => 
+          prevWorkCenters.filter(wc => wc.id !== selectedId)
+        );
+        setFilteredWorkCenters(prevFiltered => 
+          prevFiltered.filter(wc => wc.id !== selectedId)
+        );
         setSnackbar({
           open: true,
           message: 'İş merkezi başarıyla silindi',
@@ -267,20 +144,71 @@ const WorkCenterTable = () => {
       } else {
         setSnackbar({
           open: true,
-          message: response.data.data || 'İş merkezi silinirken bir hata oluştu',
+          message: 'Silme işlemi başarısız oldu',
           severity: 'error'
         });
       }
     } catch (err) {
       setSnackbar({
         open: true,
-        message: err.response?.data?.data || 'Sunucuya bağlanırken bir hata oluştu',
+        message: err.response?.data?.error || 'Silme işlemi sırasında bir hata oluştu',
         severity: 'error'
       });
     } finally {
-      setDeleteConfirmOpen(false);
-      setDeleteItemId(null);
+      setDeleteDialogOpen(false);
+      setSelectedId(null);
     }
+  };
+
+  const handleEditClick = (workCenter) => {
+    setSelectedId(workCenter.id);
+    setEditData({
+      baseCostCenterId: workCenter.baseCostCenterId,
+      shortText: workCenter.shortText || '',
+      longText: workCenter.longText || ''
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    try {
+      const response = await axios.put(`http://localhost:8080/work-center/head/${selectedId}`, editData);
+      
+      if (response.data.status === 'OK') {
+        setWorkCenters(prevWorkCenters =>
+          prevWorkCenters.map(wc =>
+            wc.id === selectedId ? { ...wc, ...response.data.data } : wc
+          )
+        );
+        setFilteredWorkCenters(prevFiltered =>
+          prevFiltered.map(wc =>
+            wc.id === selectedId ? { ...wc, ...response.data.data } : wc
+          )
+        );
+        setSnackbar({
+          open: true,
+          message: 'İş merkezi başarıyla güncellendi',
+          severity: 'success'
+        });
+        setEditModalOpen(false);
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'Güncelleme işlemi başarısız oldu',
+          severity: 'error'
+        });
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.error || 'Güncelleme işlemi sırasında bir hata oluştu',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   if (loading) {
@@ -288,7 +216,7 @@ const WorkCenterTable = () => {
       <Box sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
           <IconButton
-            onClick={() => navigate('/tables')}
+            onClick={() => navigate('/')}
             sx={{ 
               backgroundColor: 'primary.light',
               '&:hover': {
@@ -300,7 +228,7 @@ const WorkCenterTable = () => {
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h5">
-            İş Merkezi Destek Tablosu
+            İş Merkezi Listesi
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -315,7 +243,7 @@ const WorkCenterTable = () => {
       <Box sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
           <IconButton
-            onClick={() => navigate('/tables')}
+            onClick={() => navigate('/')}
             sx={{ 
               backgroundColor: 'primary.light',
               '&:hover': {
@@ -327,7 +255,7 @@ const WorkCenterTable = () => {
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h5">
-            İş Merkezi Destek Tablosu
+            İş Merkezi Listesi
           </Typography>
         </Box>
         <Alert 
@@ -350,7 +278,7 @@ const WorkCenterTable = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <IconButton
-            onClick={() => navigate('/tables')}
+            onClick={() => navigate('/')}
             sx={{ 
               backgroundColor: 'primary.light',
               '&:hover': {
@@ -362,17 +290,10 @@ const WorkCenterTable = () => {
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h5">
-            İş Merkezi Destek Tablosu
+            İş Merkezi Listesi
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setIsAddModalOpen(true)}
-          >
-            Yeni Kayıt Ekle
-          </Button>
           <Button
             variant="outlined"
             startIcon={<FilterListIcon />}
@@ -387,31 +308,36 @@ const WorkCenterTable = () => {
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell sx={{ fontWeight: 'bold' }}>İş Merkezi Kodu</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>İş Merkezi Adı</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>İş Merkezi Tipi</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Belge Numarası</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Başlangıç Tarihi</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Bitiş Tarihi</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Şirket Adı</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }} align="right">İşlemler</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredWorkCenters.map((workCenter) => (
-              <TableRow 
-                key={workCenter.id} 
-                hover
-                sx={{ 
-                  '&:hover': {
-                    backgroundColor: 'rgba(25, 118, 210, 0.08)',
-                  },
-                }}
-              >
-                <TableCell>{workCenter.docType}</TableCell>
-                <TableCell>{workCenter.docText}</TableCell>
-                <TableCell>{workCenter.companyName || '-'}</TableCell>
-                <TableCell align="right">
-                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+              <TableRow key={workCenter.id}>
+                <TableCell>{workCenter.workCenterType}</TableCell>
+                <TableCell>{workCenter.wcmDocNumber}</TableCell>
+                <TableCell>{workCenter.wcmDocFrom}</TableCell>
+                <TableCell>{workCenter.wcmDocUntil}</TableCell>
+                <TableCell>{workCenter.companyName}</TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Tooltip title="Detay">
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleDetailClick(workCenter.id)}
+                        sx={{ color: 'primary.main' }}
+                      >
+                        <VisibilityIcon />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Düzenle">
                       <IconButton 
-                        size="small"
+                        size="small" 
                         onClick={() => handleEditClick(workCenter)}
                         sx={{ color: 'primary.main' }}
                       >
@@ -420,7 +346,7 @@ const WorkCenterTable = () => {
                     </Tooltip>
                     <Tooltip title="Sil">
                       <IconButton 
-                        size="small"
+                        size="small" 
                         onClick={() => handleDeleteClick(workCenter.id)}
                         sx={{ color: 'error.main' }}
                       >
@@ -435,17 +361,18 @@ const WorkCenterTable = () => {
         </Table>
       </TableContainer>
 
-      {/* Filtre Drawer'ı */}
       <Drawer
         anchor="right"
         open={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
         PaperProps={{
-          sx: { width: 320, p: 3 }
+          sx: { width: '400px', p: 3 }
         }}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h6">Filtreler</Typography>
+          <Typography variant="h6">
+            Filtreleme
+          </Typography>
           <IconButton onClick={() => setIsFilterOpen(false)}>
             <CloseIcon />
           </IconButton>
@@ -455,226 +382,134 @@ const WorkCenterTable = () => {
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
-            label="İş Merkezi Kodu"
-            variant="outlined"
+            label="İş Merkezi Tipi"
+            value={filters.workCenterType}
+            onChange={handleFilterChange('workCenterType')}
             size="small"
             fullWidth
-            value={filters.docType}
-            onChange={handleFilterChange('docType')}
           />
           <TextField
-            label="İş Merkezi Adı"
-            variant="outlined"
+            label="Belge Numarası"
+            value={filters.wcmDocNumber}
+            onChange={handleFilterChange('wcmDocNumber')}
             size="small"
             fullWidth
-            value={filters.docText}
-            onChange={handleFilterChange('docText')}
+          />
+          <TextField
+            label="Başlangıç Tarihi"
+            value={filters.wcmDocFrom}
+            onChange={handleFilterChange('wcmDocFrom')}
+            size="small"
+            fullWidth
+          />
+          <TextField
+            label="Bitiş Tarihi"
+            value={filters.wcmDocUntil}
+            onChange={handleFilterChange('wcmDocUntil')}
+            size="small"
+            fullWidth
           />
           <TextField
             label="Şirket Adı"
-            variant="outlined"
-            size="small"
-            fullWidth
             value={filters.companyName}
             onChange={handleFilterChange('companyName')}
+            size="small"
+            fullWidth
           />
-          
-          <Box sx={{ mt: 2 }}>
-            <Button 
-              variant="contained" 
-              fullWidth 
-              onClick={clearFilters}
-              sx={{ mb: 1 }}
-            >
-              Filtreleri Temizle
-            </Button>
-            <Button 
-              variant="outlined" 
-              fullWidth 
-              onClick={() => setIsFilterOpen(false)}
-            >
-              Kapat
-            </Button>
-          </Box>
+        </Box>
+
+        <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={clearFilters}
+            fullWidth
+          >
+            Filtreleri Temizle
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => setIsFilterOpen(false)}
+            fullWidth
+          >
+            Kapat
+          </Button>
         </Box>
       </Drawer>
 
-      {/* Yeni Kayıt Modalı */}
-      <Modal
-        open={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        <Box sx={{
-          backgroundColor: 'white',
-          borderRadius: 2,
-          boxShadow: 24,
-          p: 4,
-          width: '400px',
-          maxHeight: '90vh',
-          overflow: 'auto'
-        }}>
-          <Typography variant="h6" sx={{ mb: 3 }}>
-            Yeni İş Merkezi Ekle
-          </Typography>
-
-          <Stack spacing={3}>
-            <FormControl fullWidth>
-              <InputLabel>Şirket</InputLabel>
-              <Select
-                value={newWorkCenter.companyId}
-                label="Şirket"
-                onChange={handleInputChange('companyId')}
-              >
-                {companies.map((company) => (
-                  <MenuItem key={company.id} value={company.id}>
-                    {company.comCode}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="İş Merkezi Kodu"
-              fullWidth
-              value={newWorkCenter.docType}
-              onChange={handleInputChange('docType')}
-            />
-
-            <TextField
-              label="İş Merkezi Adı"
-              fullWidth
-              value={newWorkCenter.docText}
-              onChange={handleInputChange('docText')}
-            />
-
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={newWorkCenter.isPassive}
-                  onChange={handleInputChange('isPassive')}
-                />
-              }
-              label="Pasif"
-            />
-
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button
-                variant="outlined"
-                onClick={() => setIsAddModalOpen(false)}
-              >
-                İptal
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleAddWorkCenter}
-              >
-                Kaydet
-              </Button>
-            </Box>
-          </Stack>
-        </Box>
-      </Modal>
-
-      {/* Düzenleme Modalı */}
-      <Modal
-        open={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        <Box sx={{
-          backgroundColor: 'white',
-          borderRadius: 2,
-          boxShadow: 24,
-          p: 4,
-          width: '400px',
-          maxHeight: '90vh',
-          overflow: 'auto'
-        }}>
-          <Typography variant="h6" sx={{ mb: 3 }}>
-            İş Merkezi Düzenle
-          </Typography>
-
-          <Stack spacing={3}>
-            <TextField
-              label="İş Merkezi Adı"
-              fullWidth
-              value={editWorkCenter.docText}
-              onChange={handleEditInputChange('docText')}
-            />
-
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={editWorkCenter.isPassive}
-                  onChange={handleEditInputChange('isPassive')}
-                />
-              }
-              label="Pasif"
-            />
-
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button
-                variant="outlined"
-                onClick={() => setIsEditModalOpen(false)}
-              >
-                İptal
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleEditSave}
-              >
-                Kaydet
-              </Button>
-            </Box>
-          </Stack>
-        </Box>
-      </Modal>
-
-      {/* Silme Onay Dialogu */}
+      {/* Delete Confirmation Dialog */}
       <Dialog
-        open={deleteConfirmOpen}
-        onClose={() => setDeleteConfirmOpen(false)}
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
       >
-        <DialogTitle>
-          Silme İşlemini Onayla
-        </DialogTitle>
+        <DialogTitle>Silme İşlemini Onayla</DialogTitle>
         <DialogContent>
           <Typography>
             Bu iş merkezini silmek istediğinizden emin misiniz?
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>
-            İptal
-          </Button>
+          <Button onClick={() => setDeleteDialogOpen(false)}>İptal</Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
             Sil
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
+      {/* Edit Modal */}
+      <Modal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <Box sx={{
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          width: '400px',
+          borderRadius: 1
+        }}>
+          <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
+            İş Merkezi Düzenle
+          </Typography>
+          <Stack spacing={2}>
+            <TextField
+              label="Kısa Açıklama"
+              value={editData.shortText}
+              onChange={(e) => setEditData(prev => ({ ...prev, shortText: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label="Uzun Açıklama"
+              value={editData.longText}
+              onChange={(e) => setEditData(prev => ({ ...prev, longText: e.target.value }))}
+              fullWidth
+              multiline
+              rows={4}
+            />
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+              <Button onClick={() => setEditModalOpen(false)}>
+                İptal
+              </Button>
+              <Button variant="contained" onClick={handleEditSave}>
+                Kaydet
+              </Button>
+            </Box>
+          </Stack>
+        </Box>
+      </Modal>
+
+      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
+        onClose={handleSnackbarClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

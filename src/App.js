@@ -12,9 +12,16 @@ import RouteTable from './components/pages/support-tables/RouteTable';
 import WorkCenterTable from './components/pages/support-tables/WorkCenterTable';
 import OperationTable from './components/pages/support-tables/OperationTable';
 import UnitTable from './components/pages/support-tables/UnitTable';
+import HomePage from './components/pages/HomePage';
+import MaterialHeadTable from './components/pages/material/MaterialHeadTable';
+import MaterialHeadDetail from './components/pages/material/MaterialHeadDetail';
+import CostCenterHeadTable from './components/pages/costcenter/CostCenterHeadTable';
+import CostCenterHeadDetail from './components/pages/costcenter/CostCenterHeadDetail';
+import WorkCenterDetail from './components/pages/support-tables/WorkCenterDetail';
+import BomHeadTable from './components/pages/bom/BomHeadTable';
+import BomHeadDetail from './components/pages/bom/BomHeadDetail';
 
 // Örnek sayfa bileşenleri
-const HomePage = () => <div>Ana Sayfa İçeriği</div>;
 const ContactPage = () => <div>İletişim Sayfası İçeriği</div>;
 
 const theme = createTheme({
@@ -72,14 +79,21 @@ function App() {
             <Route path="/tables" element={<SupportTablesPage />} />
             <Route path="/tables/company" element={<CompanyTable />} />
             <Route path="/tables/company/:id" element={<CompanyDetail />} />
-            <Route path="/tables/material" element={<MaterialTable />} />
-            <Route path="/tables/cost-center" element={<CostCenterTable />} />
-            <Route path="/tables/bom" element={<BomTable />} />
-            <Route path="/tables/route-type" element={<RouteTable />} />
-            <Route path="/tables/work-center" element={<WorkCenterTable />} />
+            <Route path="/material" element={<MaterialTable />} />
+            <Route path="/cost-center" element={<CostCenterTable />} />
+            <Route path="/bom" element={<BomTable />} />
+            <Route path="/route-type" element={<RouteTable />} />
+            <Route path="/work-center" element={<WorkCenterTable />} />
             <Route path="/tables/operation" element={<OperationTable />} />
             <Route path="/tables/unit" element={<UnitTable />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/material/head" element={<MaterialHeadTable />} />
+            <Route path="/material/head/:id" element={<MaterialHeadDetail />} />
+            <Route path="/costCenter/head" element={<CostCenterHeadTable />} />
+            <Route path="/costCenter/head/:id" element={<CostCenterHeadDetail />} />
+            <Route path="/work-center/head/:id" element={<WorkCenterDetail />} />
+            <Route path="/bom/head" element={<BomHeadTable />} />
+            <Route path="/bom/head/:id" element={<BomHeadDetail />} />
           </Routes>
         </MainLayout>
       </Router>
